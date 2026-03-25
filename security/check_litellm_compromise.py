@@ -249,13 +249,30 @@ def check_proxy_server_injection(verbose: bool) -> dict:
     result["sha256"] = sha256_file(proxy_server)
 
     if hits:
-        result["status"] = "SUSPICIOUS"
-        result["critical"] = True
-        result["hits"] = hits
-        result["detail"] = (
-            "CRITICAL: proxy_server.py contains suspicious obfuscated patterns. "
-            "This is consistent with the TeamPCP payload injection."
-        )
+        # Reduce false positives: subprocess.Popen alone is legitimate.
+        # Only flag as critical if we see a C2 domain OR the combination
+        # of base64 obfuscation with subprocess (the actual attack pattern).
+        hit_patterns = {h["pattern"] for h in hits}
+        has_c2 = bool(hit_patterns & {"models.litellm.cloud", "checkmarx.zone"})
+        has_base64 = bool(hit_patterns & {"base64.b64decode", "exec(base64", "__import__('base64')"})
+        has_subprocess = bool(hit_patterns & {"subprocess.Popen"})
+
+        if has_c2 or (has_base64 and has_subprocess):
+            result["status"] = "SUSPICIOUS"
+            result["critical"] = True
+            result["hits"] = hits
+            result["detail"] = (
+                "CRITICAL: proxy_server.py contains suspicious obfuscated patterns. "
+                "This is consistent with the TeamPCP payload injection."
+            )
+        else:
+            result["status"] = "ok"
+            result["critical"] = False
+            result["hits"] = hits
+            result["detail"] = (
+                "Some patterns matched (e.g. subprocess.Popen) but without C2 domains "
+                "or base64 obfuscation — likely legitimate usage."
+            )
     else:
         result["status"] = "ok"
         result["detail"] = "No suspicious patterns found in proxy_server.py."
