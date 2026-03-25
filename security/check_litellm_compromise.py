@@ -5,7 +5,7 @@ LiteLLM Supply Chain Attack Detector
 Detects indicators of compromise from the TeamPCP supply chain attack
 targeting LiteLLM versions 1.82.7 and 1.82.8 (March 24, 2026).
 
-CVE Reference: PyPI Advisory - litellm 1.82.7 / 1.82.8
+Advisory: MAL-2026-2144 (OSV) / PYSEC-2026-2
 Threat Actor: TeamPCP
 C2 Domains: models.litellm.cloud, checkmarx.zone
 
@@ -43,7 +43,7 @@ SAFE_VERSIONS_BELOW   = "1.82.6"   # last known clean release
 SAFE_REINSTALL_VERSION = "1.82.6"  # version to pin on --fix
 SAFE_PIN_CONSTRAINT    = "litellm>=1.82.4,<1.82.7"  # pip constraint to block compromised range
 
-# Known SHA-256 of the malicious .pth file (from GitHub issue #24512)
+# Known SHA-256 of the malicious .pth file (MAL-2026-2144 / GitHub issue #24518)
 MALICIOUS_PTH_SHA256 = "71da6fc30c099cd1ebe57a28c6161a6c99e5f56bdf9bcbf06be0fc19d1b534e2"
 
 # Indicators of compromise

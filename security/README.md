@@ -12,7 +12,7 @@ On March 24, 2026, threat actor **TeamPCP** published trojanized versions of the
 - Exfiltrated environment variables (API keys, cloud credentials, database URLs) to C2 domains
 - Attempted lateral movement in Kubernetes environments via `node-setup-*` pods
 
-**CVE Reference:** PyPI Advisory — litellm 1.82.7 / 1.82.8
+**Advisory:** [MAL-2026-2144](https://osv.dev/vulnerability/MAL-2026-2144) (OSV) / PYSEC-2026-2
 **C2 Domains:** `models.litellm.cloud`, `checkmarx.zone`
 
 ## Quick Start
@@ -90,7 +90,8 @@ Installs litellm with a version constraint (`litellm>=1.82.4,<1.82.7`) that prev
 
 - [LiteLLM Official Security Advisory](https://docs.litellm.ai/blog/security-update-march-2026)
 - [Wiz Research: TeamPCP Trojanizes LiteLLM](https://www.wiz.io/blog/threes-a-crowd-teampcp-trojanizes-litellm-in-continuation-of-campaign)
-- [GitHub Issue #24512](https://github.com/BerriAI/litellm/issues/24512)
+- [GitHub Issue #24518](https://github.com/BerriAI/litellm/issues/24518)
+- [OSV MAL-2026-2144](https://osv.dev/vulnerability/MAL-2026-2144)
 
 ## License
 
