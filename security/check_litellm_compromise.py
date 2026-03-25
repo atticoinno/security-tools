@@ -15,6 +15,8 @@ Usage:
     python3 check_litellm_compromise.py --json           # JSON output
     python3 check_litellm_compromise.py --fix            # detect + auto-remediate
     python3 check_litellm_compromise.py --fix --dry-run  # show what --fix would do
+    python3 check_litellm_compromise.py --pin            # pin litellm to safe version range
+    python3 check_litellm_compromise.py --fix --pin      # remediate + pin
 
 References:
     https://docs.litellm.ai/blog/security-update-march-2026
@@ -39,6 +41,7 @@ from datetime import datetime
 COMPROMISED_VERSIONS  = {"1.82.7", "1.82.8"}
 SAFE_VERSIONS_BELOW   = "1.82.6"   # last known clean release
 SAFE_REINSTALL_VERSION = "1.82.6"  # version to pin on --fix
+SAFE_PIN_CONSTRAINT    = "litellm>=1.82.4,<1.82.7"  # pip constraint to block compromised range
 
 # Known SHA-256 of the malicious .pth file (from GitHub issue #24512)
 MALICIOUS_PTH_SHA256 = "71da6fc30c099cd1ebe57a28c6161a6c99e5f56bdf9bcbf06be0fc19d1b534e2"
@@ -596,7 +599,7 @@ class RemediationAction:
             self.output = str(e)
 
 
-def build_remediation_plan(results: list[dict], dry_run: bool) -> list[RemediationAction]:
+def build_remediation_plan(results: list[dict], dry_run: bool, pin: bool = False) -> list[RemediationAction]:
     """
     Given the list of check results, build an ordered list of
     RemediationActions needed to clean the environment.
@@ -796,6 +799,24 @@ def build_remediation_plan(results: list[dict], dry_run: bool) -> list[Remediati
             dry_run=dry_run,
         ))
 
+    # ── Step 9: Pin to safe version range ──────────────────────────────────
+    if pin:
+        def _pin():
+            rc, out, err = run([
+                sys.executable, "-m", "pip", "install",
+                SAFE_PIN_CONSTRAINT, "--no-cache-dir"
+            ])
+            if rc == 0:
+                return f"Pinned: {SAFE_PIN_CONSTRAINT} — compromised versions are now blocked."
+            return f"Pin failed (rc={rc}): {err or out}"
+
+        actions.append(RemediationAction(
+            title=f"Pin litellm to safe range ({SAFE_PIN_CONSTRAINT})",
+            detail=f"pip install '{SAFE_PIN_CONSTRAINT}' --no-cache-dir",
+            fn=_pin,
+            dry_run=dry_run,
+        ))
+
     return actions
 
 
@@ -895,6 +916,8 @@ def main():
                         help="Auto-remediate: remove malicious files, uninstall, reinstall safe version")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what --fix would do without making any changes")
+    parser.add_argument("--pin", action="store_true",
+                        help="Pin litellm to a safe version range that blocks compromised versions")
     args = parser.parse_args()
 
     # --dry-run implies --fix (show the plan)
@@ -937,8 +960,8 @@ def main():
         render_text_report(results, args.verbose)
 
     # ── Remediation ──────────────────────────────────────────────────────
-    if args.fix:
-        actions = build_remediation_plan(results, dry_run=args.dry_run)
+    if args.fix or args.pin:
+        actions = build_remediation_plan(results, dry_run=args.dry_run, pin=args.pin)
 
         if not actions:
             print(c(GREEN, "  ✔ Nothing to remediate — environment appears clean.\n"))
