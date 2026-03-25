@@ -32,6 +32,15 @@ python3 check_litellm_compromise.py --fix
 
 # Dry run (show what --fix would do)
 python3 check_litellm_compromise.py --fix --dry-run
+
+# Pin litellm to safe version range (blocks compromised versions)
+python3 check_litellm_compromise.py --pin
+
+# Full remediate + pin
+python3 check_litellm_compromise.py --fix --pin
+
+# Pin dry run
+python3 check_litellm_compromise.py --pin --dry-run
 ```
 
 ## What It Checks
@@ -40,7 +49,7 @@ python3 check_litellm_compromise.py --fix --dry-run
 |-------|-------------|
 | **Installed version** | Flags litellm 1.82.7 / 1.82.8 as compromised |
 | **Malicious .pth file** | Searches site-packages for `litellm_init.pth` (SHA-256 verified) |
-| **Proxy server injection** | Scans `proxy_server.py` for obfuscated payload patterns |
+| **Proxy server injection** | Scans `proxy_server.py` for obfuscated payload patterns (requires C2 domain or base64+subprocess co-occurrence to flag — reduces false positives) |
 | **Persistence backdoor** | Checks for `sysmon.py`, `sysmon.service`, and staging files |
 | **Package cache** | Scans pip and uv caches for cached malicious wheels |
 | **C2 connections** | Checks active network connections to known C2 domains |
@@ -50,13 +59,17 @@ python3 check_litellm_compromise.py --fix --dry-run
 ## What `--fix` Does
 
 1. Stops and disables the `sysmon` systemd backdoor service
-2. Removes persistence files (`~/.config/sysmon/`, `/tmp/p.py`, etc.)
-3. Deletes malicious `litellm_init.pth` from site-packages
+2. Removes persistence files (`~/.config/sysmon/`, `/tmp/p.py`, etc.) — skips symlinks for safety
+3. Deletes malicious `litellm_init.pth` from site-packages — skips symlinks for safety
 4. Uninstalls the compromised litellm package
 5. Purges pip and uv caches of malicious wheels
 6. Reinstalls `litellm==1.82.6` (last known clean version)
 7. Verifies the clean installation
 8. Displays a mandatory credential rotation checklist
+
+## What `--pin` Does
+
+Installs litellm with a version constraint (`litellm>=1.82.4,<1.82.7`) that prevents pip from upgrading into the compromised version range. Can be used standalone or combined with `--fix`.
 
 ## Requirements
 

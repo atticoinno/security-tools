@@ -32,7 +32,7 @@ import hashlib
 import argparse
 import platform
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ──────────────────────────────────────────────
 # Configuration
@@ -509,7 +509,7 @@ def render_text_report(results: list[dict], verbose: bool):
     print(c(BOLD, "=" * 65))
     print(f"  Host      : {platform.node()}")
     print(f"  Python    : {sys.version.split()[0]}")
-    print(f"  Timestamp : {datetime.utcnow().isoformat()}Z")
+    print(f"  Timestamp : {datetime.now(timezone.utc).isoformat()}Z")
     print(c(BOLD, "=" * 65))
     print()
 
@@ -558,7 +558,7 @@ def render_text_report(results: list[dict], verbose: bool):
 def render_json_report(results: list[dict]):
     report = {
         "tool": "litellm_compromise_detector",
-        "timestamp_utc": datetime.utcnow().isoformat() + "Z",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat() + "Z",
         "host": platform.node(),
         "python": sys.version.split()[0],
         "compromised_versions": list(COMPROMISED_VERSIONS),
@@ -659,10 +659,13 @@ def build_remediation_plan(results: list[dict], dry_run: bool, pin: bool = False
         found_files = persistence_result.get("found", [])
 
         def _remove_persistence(files=found_files):
-            removed, failed = [], []
+            removed, failed, skipped = [], [], []
             for entry in files:
                 p = Path(entry["path"])
                 try:
+                    if p.is_symlink():
+                        skipped.append(f"{p} (symlink → {os.readlink(p)}, skipped for safety)")
+                        continue
                     if p.is_dir():
                         import shutil
                         shutil.rmtree(p)
@@ -673,6 +676,7 @@ def build_remediation_plan(results: list[dict], dry_run: bool, pin: bool = False
                     failed.append(f"{p}: {e}")
             msg = ""
             if removed: msg += "Removed: " + ", ".join(removed)
+            if skipped: msg += "\nSkipped: " + ", ".join(skipped)
             if failed:  msg += "\nFailed:  " + ", ".join(failed)
             return msg or "Nothing to remove."
 
@@ -692,15 +696,19 @@ def build_remediation_plan(results: list[dict], dry_run: bool, pin: bool = False
         pth_paths = [Path(e["path"]) for e in pth_result.get("found_paths", [])]
 
         def _remove_pth(paths=pth_paths):
-            removed, failed = [], []
+            removed, failed, skipped = [], [], []
             for p in paths:
                 try:
+                    if p.is_symlink():
+                        skipped.append(f"{p} (symlink → {os.readlink(p)}, skipped for safety)")
+                        continue
                     p.unlink()
                     removed.append(str(p))
                 except Exception as e:
                     failed.append(f"{p}: {e}")
             msg = ""
             if removed: msg += "Removed: " + ", ".join(removed)
+            if skipped: msg += "\nSkipped: " + ", ".join(skipped)
             if failed:  msg += "\nFailed:  " + ", ".join(failed)
             return msg or "Nothing to remove."
 
@@ -981,8 +989,8 @@ def main():
 
         execute_remediation(actions, dry_run=args.dry_run)
 
-        # Always show credential rotation checklist after a fix
-        if not args.dry_run:
+        # Show credential rotation checklist after a fix (not for pin-only)
+        if not args.dry_run and args.fix:
             render_credential_rotation_checklist(results)
 
         # Post-fix summary
